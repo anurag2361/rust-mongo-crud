@@ -1,0 +1,14 @@
+[package]
+name = "rust_mongo"
+version = "0.1.0"
+authors = ["Anurag Sharma"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+mongodb = "1.1.1"
+actix-web = "3.3.2"
+dotenv = "0.15.0"
+r2d2-mongodb = "0.2.2"
+r2d2 = "0.8.9"
