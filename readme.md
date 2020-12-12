@@ -1,0 +1,2 @@
+# Current State
+As of now, it starts a server and connects to a mongodb instance. It persists the database connection, rather than establishing connection when required, which is not only inefficient but resource intensive at high traffic.
