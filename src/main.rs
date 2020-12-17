@@ -5,9 +5,17 @@ extern crate r2d2_mongodb;
 use r2d2::Pool;
 use r2d2_mongodb::{ConnectionOptions, MongodbConnectionManager};
 
-use actix_web::{web, App, HttpRequest, HttpServer, Responder};
+use actix_web::{web, App, HttpRequest, HttpResponse, HttpServer, Responder};
 use dotenv::dotenv;
+use serde::Deserialize;
 use std::env;
+
+// =======Structs============
+#[derive(Deserialize)]
+struct Info {
+    name: String,
+}
+// ==============
 
 async fn with_id(req: HttpRequest) -> impl Responder {
     let name = req.match_info().get("name").expect("Name not found");
@@ -17,6 +25,10 @@ async fn with_id(req: HttpRequest) -> impl Responder {
 
 async fn index(req: HttpRequest) -> impl Responder {
     format!("Hello world")
+}
+
+async fn post_request(info: web::Json<Info>) -> HttpResponse {
+    HttpResponse::Ok().body(format!("username: {}", info.name))
 }
 
 fn get_server_address() -> String {
@@ -45,6 +57,7 @@ async fn main() -> std::io::Result<()> {
         App::new()
             .route("/", web::get().to(index))
             .route("/{name}/{id}", web::get().to(with_id))
+            .route("/postdata", web::post().to(post_request))
     })
     .bind(&binding_address)?
     .run()

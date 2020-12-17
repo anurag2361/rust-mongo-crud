@@ -2205,6 +2205,7 @@ dependencies = [
  "mongodb 1.1.1",
  "r2d2",
  "r2d2-mongodb",
+ "serde",
 ]
 
 [[package]]
