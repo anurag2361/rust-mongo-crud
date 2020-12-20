@@ -1,12 +1,10 @@
 extern crate dotenv;
-extern crate r2d2;
-extern crate r2d2_mongodb;
-
-use r2d2::Pool;
-use r2d2_mongodb::{ConnectionOptions, MongodbConnectionManager};
 
 use actix_web::{web, App, HttpRequest, HttpResponse, HttpServer, Responder};
+use bson::{doc, Bson, Document};
 use dotenv::dotenv;
+use mongodb::options::{ClientOptions, StreamAddress};
+use mongodb::Client;
 use serde::Deserialize;
 use std::env;
 
@@ -14,6 +12,10 @@ use std::env;
 #[derive(Deserialize)]
 struct Info {
     name: String,
+}
+
+pub struct State {
+    client: mongodb::Client,
 }
 // ==============
 
@@ -27,8 +29,14 @@ async fn index(req: HttpRequest) -> impl Responder {
     format!("Hello world")
 }
 
-async fn post_request(info: web::Json<Info>) -> HttpResponse {
-    HttpResponse::Ok().body(format!("username: {}", info.name))
+async fn post_request(info: web::Json<Info>, data: web::Data<State>) -> impl Responder {
+    let name: &str = &info.name;
+    let collection = data.client.database("test1").collection("user");
+    let result = collection
+        .insert_one(doc! {"name":name}, None)
+        .await
+        .unwrap();
+    HttpResponse::Ok().json(result).await
 }
 
 fn get_server_address() -> String {
@@ -40,21 +48,25 @@ fn get_server_address() -> String {
 async fn main() -> std::io::Result<()> {
     dotenv().ok();
 
-    let mongodb_host = env::var("MONGODB_HOST").expect("MongoDB Host not found.");
-    let manager = MongodbConnectionManager::new(
-        ConnectionOptions::builder()
-            .with_host(&mongodb_host, 27017)
-            .with_db("test1")
-            .build(),
-    );
+    let mongodb_host: String = env::var("MONGODB_HOST").expect("MongoDB Host not found.");
 
-    let pool = Pool::builder().max_size(16).build(manager).unwrap();
+    let options = ClientOptions::builder()
+        .hosts(vec![StreamAddress {
+            hostname: mongodb_host,
+            port: Some(27017),
+        }])
+        .build();
+
+    let client = Client::with_options(options).unwrap();
 
     let port = env::var("PORT").expect("PORT not set.");
     let binding_address = get_server_address();
     println!("Server running at http://127.0.0.1:{}", port);
-    HttpServer::new(|| {
+    HttpServer::new(move || {
         App::new()
+            .data(State {
+                client: client.clone(),
+            })
             .route("/", web::get().to(index))
             .route("/{name}/{id}", web::get().to(with_id))
             .route("/postdata", web::post().to(post_request))
