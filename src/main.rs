@@ -1,7 +1,7 @@
 extern crate dotenv;
 
 use actix_web::{web, App, HttpRequest, HttpResponse, HttpServer, Responder};
-use bson::{doc, Bson, Document};
+use bson::doc;
 use dotenv::dotenv;
 use mongodb::options::{ClientOptions, StreamAddress};
 use mongodb::Client;
@@ -19,12 +19,6 @@ pub struct State {
 }
 // ==============
 
-async fn with_id(req: HttpRequest) -> impl Responder {
-    let name = req.match_info().get("name").expect("Name not found");
-    let id = req.match_info().get("id").expect("ID not found");
-    format!("Hello {} with id: {}! ", &name, &id)
-}
-
 async fn index(req: HttpRequest) -> impl Responder {
     format!("Hello world")
 }
@@ -36,6 +30,19 @@ async fn post_request(info: web::Json<Info>, data: web::Data<State>) -> impl Res
         .insert_one(doc! {"name":name}, None)
         .await
         .unwrap();
+    HttpResponse::Ok().json(result).await
+}
+
+async fn get_request(req: HttpRequest, data: web::Data<State>) -> impl Responder {
+    let oid = req.match_info().get("oid").expect("OID not found");
+    let collection = data.client.database("test1").collection("user");
+    let result = collection
+        .find_one(
+            doc! {"_id":bson::oid::ObjectId::with_string(oid).unwrap()},
+            None,
+        )
+        .await
+        .expect("Error in finding document");
     HttpResponse::Ok().json(result).await
 }
 
@@ -68,8 +75,8 @@ async fn main() -> std::io::Result<()> {
                 client: client.clone(),
             })
             .route("/", web::get().to(index))
-            .route("/{name}/{id}", web::get().to(with_id))
             .route("/postdata", web::post().to(post_request))
+            .route("/user/find/{oid}", web::get().to(get_request))
     })
     .bind(&binding_address)?
     .run()
