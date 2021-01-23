@@ -17,6 +17,10 @@ struct Info {
     name: String,
 }
 #[derive(Deserialize)]
+struct Delete {
+    id: String,
+}
+#[derive(Deserialize)]
 struct Update {
     id: String,
     name: String,
@@ -80,6 +84,18 @@ async fn update_doc(body: web::Json<Update>, data: web::Data<Mutex<Client>>) -> 
     HttpResponse::Ok().json(update_result).await
 }
 
+async fn delete_doc(info: web::Json<Delete>, data: web::Data<Mutex<Client>>) -> impl Responder {
+    let collection = data.lock().unwrap().database("test1").collection("users");
+    let query = doc! {
+        "_id": oid::ObjectId::with_string(&info.id).unwrap()
+    };
+    let delete_query = collection
+        .delete_many(query, None)
+        .await
+        .expect("Delete Error");
+    HttpResponse::Ok().json(delete_query).await
+}
+
 fn get_server_address() -> String {
     let port = env::var("PORT").expect("PORT not set.");
     return "127.0.0.1:".to_owned() + &port;
@@ -111,6 +127,7 @@ async fn main() -> std::io::Result<()> {
             .route("/user/find/{oid}", web::get().to(get_request))
             .route("/user/getall", web::get().to(get_all_request))
             .route("/user/update", web::patch().to(update_doc))
+            .route("/user/delete", web::delete().to(delete_doc))
     })
     .bind(&binding_address)?
     .run()
