@@ -31,32 +31,41 @@ async fn index(_req: HttpRequest) -> impl Responder {
     format!("Hello world")
 }
 
-async fn post_request(info: web::Json<Info>, data: web::Data<Mutex<Client>>) -> impl Responder {
+async fn post_request(info: web::Json<Info>, data: web::Data<Mutex<Client>>) -> HttpResponse {
     let document = doc! {
         "name": info.name.to_string(),
         "created_at": Utc::now().timestamp_millis(),
         "updated_at": Utc::now().timestamp_millis(),
     };
     let collection = data.lock().unwrap().database("test1").collection("users");
-    let result = collection.insert_one(document, None).await.unwrap();
-    HttpResponse::Ok().json(result).await
+    match collection.insert_one(document, None).await {
+        Ok(result) => HttpResponse::Ok().json(result),
+        Err(e) => {
+            eprintln!("Error while saving, {:?}", e);
+            HttpResponse::InternalServerError().finish()
+        }
+    }
 }
 
-async fn get_request(req: HttpRequest, data: web::Data<Mutex<Client>>) -> impl Responder {
+async fn get_request(req: HttpRequest, data: web::Data<Mutex<Client>>) -> HttpResponse {
     let oid = req.match_info().get("oid").expect("OID not found");
     let collection = data.lock().unwrap().database("test1").collection("users");
-    let result = collection
+    match collection
         .find_one(
             doc! {"_id":bson::oid::ObjectId::with_string(oid).unwrap()},
             None,
         )
         .await
-        .unwrap()
-        .expect("Error in finding document");
-    HttpResponse::Ok().json(result).await
+    {
+        Ok(result) => HttpResponse::Ok().json(result),
+        Err(e) => {
+            eprintln!("Error while getting document, {:?}", e);
+            HttpResponse::InternalServerError().finish()
+        }
+    }
 }
 
-async fn get_all_request(_req: HttpRequest, data: web::Data<Mutex<Client>>) -> impl Responder {
+async fn get_all_request(_req: HttpRequest, data: web::Data<Mutex<Client>>) -> HttpResponse {
     let collection = data.lock().unwrap().database("test1").collection("users");
     let mut cursor = collection.find(None, None).await.expect("Find error");
     let mut vec = Vec::new();
@@ -66,10 +75,10 @@ async fn get_all_request(_req: HttpRequest, data: web::Data<Mutex<Client>>) -> i
             Err(e) => panic!("{}", e),
         }
     }
-    HttpResponse::Ok().json(vec).await
+    HttpResponse::Ok().json(vec)
 }
 
-async fn update_doc(body: web::Json<Update>, data: web::Data<Mutex<Client>>) -> impl Responder {
+async fn update_doc(body: web::Json<Update>, data: web::Data<Mutex<Client>>) -> HttpResponse {
     let collection = data.lock().unwrap().database("test1").collection("users");
     let query = doc! {
         "_id": oid::ObjectId::with_string(&body.id).unwrap()
@@ -77,23 +86,27 @@ async fn update_doc(body: web::Json<Update>, data: web::Data<Mutex<Client>>) -> 
     let update = doc! {
         "$set": {"name": &body.name,"updated_at": Utc::now().timestamp_millis(), }
     };
-    let update_result = collection
-        .update_one(query, update, None)
-        .await
-        .expect("Update Error");
-    HttpResponse::Ok().json(update_result).await
+    match collection.update_one(query, update, None).await {
+        Ok(update_result) => HttpResponse::Ok().json(update_result),
+        Err(e) => {
+            eprintln!("Error while updating document, {:?}", e);
+            HttpResponse::InternalServerError().finish()
+        }
+    }
 }
 
-async fn delete_doc(info: web::Json<Delete>, data: web::Data<Mutex<Client>>) -> impl Responder {
+async fn delete_doc(info: web::Json<Delete>, data: web::Data<Mutex<Client>>) -> HttpResponse {
     let collection = data.lock().unwrap().database("test1").collection("users");
     let query = doc! {
         "_id": oid::ObjectId::with_string(&info.id).unwrap()
     };
-    let delete_query = collection
-        .delete_many(query, None)
-        .await
-        .expect("Delete Error");
-    HttpResponse::Ok().json(delete_query).await
+    match collection.delete_many(query, None).await {
+        Ok(delete_query) => HttpResponse::Ok().json(delete_query),
+        Err(e) => {
+            eprintln!("Error while updating document, {:?}", e);
+            HttpResponse::InternalServerError().finish()
+        }
+    }
 }
 
 fn get_server_address() -> String {
