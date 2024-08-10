@@ -4,11 +4,10 @@ use crate::state::app_state::AppState;
 use actix_contrib_logger::middleware::Logger;
 use actix_web::{web, App, HttpServer};
 use env_logger::Env;
-use http::StatusCode;
 use log::Level;
 extern crate dotenv;
 use dotenv::dotenv;
-use std::{env, i32};
+use std::env;
 
 mod config;
 mod handlers;
